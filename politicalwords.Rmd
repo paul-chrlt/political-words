@@ -7,16 +7,73 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library(ggraph)
+library(igraph)
 ```
 
 ## Introduction
 
-## Scrapping
+Nous allons analyser le contenu texte de 3 partis politiques francais pour voir comment ils diffèrent.
+
+## Acquisition des données : scrapping
 
 La première étape consistera à automatiser la lecture des sites internet. Pour chacun :
 
-* aller sur la page listant les actualités et récupérer un tableau contenant un titre, un lien, une date (idéalement)
-* aller sur chaque lien récupéré pour récupérer les textes des articles en différenciant le corps de texte des titres
+* aller sur la page listant les actualités et récupérer un tableau contenant un titre, un lien.
+* aller sur la page suivante et recommencer, jusqu'à avoir une quantité de liens suffisante.
+* aller sur chaque lien récupéré pour récupérer les textes des articles en différenciant le corps de texte, le titre, la date de publication.
 
 Nous allons créer 3 fonctions différentes pour analyser 3 partis. Ces fonctions ne sont pas appelées directement dans ce document pour éviter de solliciter abusivement les serveurs de ces 3 sites. Vous retrouverez le fonctionnement dans les sources : `scraper_rn.R`, `scraper_lrm.R`, `scraper_eelv.R`.
 
+```{r}
+load('articlesRN.Rdata')
+load('articlesEELV.Rdata')
+load('articlesLRM.Rdata')
+```
+
+## Réseaux lexicaux
+
+```{r}
+library(udpipe)
+library(magrittr)
+library(dplyr)
+load(file("https://github.com/sborms/sentometrics/raw/master/data-raw/FEEL_fr.rda"))
+load(file("https://github.com/sborms/sentometrics/raw/master/data-raw/valence-raw/valShifters.rda"))
+polarity_terms <- rename(FEEL_fr, term = x, polarity = y)
+polarity_negators <- subset(valShifters$valence_fr, t == 1)$x
+polarity_amplifiers <- subset(valShifters$valence_fr, t == 2)$x
+polarity_deamplifiers <- subset(valShifters$valence_fr, t == 3)$x
+# udpipe_download_model("french")
+udpipeModel <- udpipe_load_model("french-gsd-ud-2.4-190531.udpipe")
+
+articlesContent <- articlesRN$articleContent
+udpipedText <- udpipe(articlesContent,udpipeModel)
+sentiments <- txt_sentiment(udpipedText, term = "lemma", 
+                            polarity_terms = polarity_terms,
+                            polarity_negators = polarity_negators, 
+                            polarity_amplifiers = polarity_amplifiers,
+                            polarity_deamplifiers = polarity_deamplifiers)
+sentiments <- sentiments$data
+reasons <- sentiments %>% 
+  cbind_dependencies() %>%
+  select(doc_id, lemma, token, upos, sentiment_polarity, token_parent, lemma_parent, upos_parent, dep_rel) %>%
+  filter(sentiment_polarity < 0)
+reasons <- filter(reasons, dep_rel %in% "amod")
+word_cooccurences <- reasons %>% 
+  group_by(lemma, lemma_parent) %>%
+  summarise(cooc = n()) %>%
+  arrange(-cooc)
+vertices <- bind_rows(
+  data_frame(key = unique(reasons$lemma)) %>% mutate(in_dictionary = if_else(key %in% polarity_terms$term, "in_dictionary", "linked-to")),
+  data_frame(key = unique(setdiff(reasons$lemma_parent, reasons$lemma))) %>% mutate(in_dictionary = "linked-to"))
+cooc <- head(word_cooccurences, 40)
+set.seed(123456789)
+graphicNegatives <- cooc %>%  
+  graph_from_data_frame(vertices = filter(vertices, key %in% c(cooc$lemma, cooc$lemma_parent))) %>%
+  ggraph(layout = "fr") +
+  geom_edge_link0(aes(edge_alpha = cooc, edge_width = cooc)) +
+  geom_node_point(aes(colour = in_dictionary), size = 5) +
+  geom_node_text(aes(label = name), vjust = 1.8, col = "darkgreen") +
+  ggtitle("Les mots liés aux sentiments négatifs au RN") +
+  theme_void()
+```
