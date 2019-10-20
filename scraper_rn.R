@@ -29,6 +29,7 @@ for(i in 2:nPagesTarget){
     articleLinks <- rbind(articleLinks,cbind(titles,links))
 }
 articleLinks$titles <- unlist(articleLinks$titles)
+articleLinks$links <- unlist(articleLinks$links)
 write.csv(articleLinks,file="rnArticles.csv",row.names = FALSE)
 
 ## articles retrieval
