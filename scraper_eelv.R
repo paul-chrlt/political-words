@@ -40,7 +40,7 @@ titleCss <- "h1 span"
 
 articles <- data.frame(title = character(),date=character(),content=character())
 
-for(i in 1:length(articleLinks$links)){
+for(i in 33:length(articleLinks$links)){
     print(paste("article",i,"on",length(articleLinks$links)))
     randompause()
     articlePage <- read_html(articleLinks$links[i])
@@ -52,7 +52,4 @@ for(i in 1:length(articleLinks$links)){
 }
 write.csv(articles,file="articlesEELV.csv",row.names = FALSE)
 articlesEELV <- articles
-save(articlesRN,file="articlesEELV.Rdata")
-
-
-.entry-content-container > p
+save(articlesEELV,file="articlesEELV.Rdata")
