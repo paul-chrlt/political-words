@@ -1,0 +1,22 @@
+---
+title: "Analyse sémantique des partis politiques francais"
+author: "Paul Charlet"
+date: "October 20, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+
+## Scrapping
+
+La première étape consistera à automatiser la lecture des sites internet. Pour chacun :
+
+* aller sur la page listant les actualités et récupérer un tableau contenant un titre, un lien, une date (idéalement)
+* aller sur chaque lien récupéré pour récupérer les textes des articles en différenciant le corps de texte des titres
+
+Nous allons créer 3 fonctions différentes pour analyser 3 partis. Ces fonctions ne sont pas appelées directement dans ce document pour éviter de solliciter abusivement les serveurs de ces 3 sites. Vous retrouverez le fonctionnement dans les sources : `scraper_rn.R`, `scraper_lrm.R`, `scraper_eelv.R`.
+
