@@ -46,7 +46,7 @@ polarity_deamplifiers <- subset(valShifters$valence_fr, t == 3)$x
 # udpipe_download_model("french")
 udpipeModel <- udpipe_load_model("french-gsd-ud-2.4-190531.udpipe")
 
-articlesContent <- articlesRN$articleContent
+articlesContent <- articlesLRM$articleContent
 udpipedText <- udpipe(articlesContent,udpipeModel)
 sentiments <- txt_sentiment(udpipedText, term = "lemma", 
                             polarity_terms = polarity_terms,
@@ -56,8 +56,8 @@ sentiments <- txt_sentiment(udpipedText, term = "lemma",
 sentiments <- sentiments$data
 reasons <- sentiments %>% 
   cbind_dependencies() %>%
-  select(doc_id, lemma, token, upos, sentiment_polarity, token_parent, lemma_parent, upos_parent, dep_rel) %>%
-  filter(sentiment_polarity < 0)
+  select(doc_id, lemma, token, upos, sentiment_polarity, token_parent, lemma_parent, upos_parent, dep_rel) #%>%
+#  filter(sentiment_polarity < 0)
 reasons <- filter(reasons, dep_rel %in% "amod")
 word_cooccurences <- reasons %>% 
   group_by(lemma, lemma_parent) %>%
@@ -66,14 +66,14 @@ word_cooccurences <- reasons %>%
 vertices <- bind_rows(
   data_frame(key = unique(reasons$lemma)) %>% mutate(in_dictionary = if_else(key %in% polarity_terms$term, "in_dictionary", "linked-to")),
   data_frame(key = unique(setdiff(reasons$lemma_parent, reasons$lemma))) %>% mutate(in_dictionary = "linked-to"))
-cooc <- head(word_cooccurences, 40)
+cooc <- head(word_cooccurences, 50)
 set.seed(123456789)
-graphicNegatives <- cooc %>%  
+graphicLexicalNetworks <- cooc %>%  
   graph_from_data_frame(vertices = filter(vertices, key %in% c(cooc$lemma, cooc$lemma_parent))) %>%
   ggraph(layout = "fr") +
   geom_edge_link0(aes(edge_alpha = cooc, edge_width = cooc)) +
   geom_node_point(aes(colour = in_dictionary), size = 5) +
   geom_node_text(aes(label = name), vjust = 1.8, col = "darkgreen") +
-  ggtitle("Les mots liés aux sentiments négatifs au RN") +
+  ggtitle("Les réseaux lexicaux à LRM") +
   theme_void()
 ```
