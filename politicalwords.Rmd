@@ -31,23 +31,75 @@ load('articlesEELV.Rdata')
 load('articlesLRM.Rdata')
 ```
 
-## Réseaux lexicaux
+## Préparation des données : UDpipe
+
+Nous allons ensuite utiliser UDpipe pour préparer nos données. Nous allons l'utiliser pour identifier dans nos textes :
+
+* le radical de chaque mot : pour que les accords et la conjugaison ne perturbent pas l'analyse
+* la fonction grammaticale de chaque mot : nous pourrons par exemple choisir d'exclure les prépositions
+
+Il faudra lui fournir un modèle correspondant à la langue francaise. Nous le téléchargeons une fois sur le disque avec la fonction `udpipe_download_model`.
 
 ```{r}
 library(udpipe)
-library(magrittr)
 library(dplyr)
+# udpipe_download_model("french")
+udpipeModel <- udpipe_load_model("french-gsd-ud-2.4-190531.udpipe")
+```
+
+Il nous reste alors à préparer les donnés pour nos 3 ensembles de textes :
+
+```{r}
+udpipedLRM <- udpipe(articlesLRM$articleContent,udpipeModel)
+udpipedEELV <- udpipe(articlesEELV$articleContent,udpipeModel)
+udpipedRN <- udpipe(articlesRN$articleContent,udpipeModel)
+```
+
+## Réseaux lexicaux
+
+Nous pouvons commencer par regarder les mots souvent présents ensembles. Cela nous permettra d'identifier de grands thèmes ou expressions. Créons la fonction `viewCoocurences()` qui prendra en entrée des objets UDpipe et retournera un graphique des coocurences pour ces objets.
+
+```{r,fig.height=24,fig.width=8}
+library(cowplot)
+coocurences <- list()
+viewCoocurences <- function(udpipeObjects){
+    for(i in 1:length(udpipeObjects)){
+        coocurences[[i]] <- cooccurrence(x = subset(udpipeObjects[[i]], upos %in% c("NOUN", "ADJ")), 
+                                       term = "lemma",
+                                       group = c("sentence_id"),
+                                       skipgram = 4)
+    }
+    wordnetwork <- lapply(coocurences, head,30)
+    wordnetwork <- lapply(wordnetwork, graph_from_data_frame)
+    coocGraphs <- list()
+    for (i in 1:length(wordnetwork)) {
+        coocGraphs[[i]] <- ggraph(wordnetwork[[i]], layout = "fr") +
+            geom_edge_link(aes(width = cooc, edge_alpha = cooc), edge_colour = "blue") +
+            geom_node_text(aes(label = name), col = "black", size = 4) +
+            theme(legend.position = "none") +
+            labs(title = paste("Cooccurrences des mots,",names(udpipeObjects[i])), subtitle = "Nouns & Adjective")
+    }
+    plot_grid(plotlist = coocGraphs, labels = "",ncol=1) + theme_void()
+}
+udpipeObjects <- list("EELV"=udpipedEELV,"LRM"=udpipedLRM,"RN"=udpipedRN)
+viewCoocurences(udpipeObjects)
+```
+
+
+## Sentiments
+
+```{r}
+
+udpipedText <- udpipedEELV
+
+library(magrittr)
 load(file("https://github.com/sborms/sentometrics/raw/master/data-raw/FEEL_fr.rda"))
 load(file("https://github.com/sborms/sentometrics/raw/master/data-raw/valence-raw/valShifters.rda"))
 polarity_terms <- rename(FEEL_fr, term = x, polarity = y)
 polarity_negators <- subset(valShifters$valence_fr, t == 1)$x
 polarity_amplifiers <- subset(valShifters$valence_fr, t == 2)$x
 polarity_deamplifiers <- subset(valShifters$valence_fr, t == 3)$x
-# udpipe_download_model("french")
-udpipeModel <- udpipe_load_model("french-gsd-ud-2.4-190531.udpipe")
 
-articlesContent <- articlesLRM$articleContent
-udpipedText <- udpipe(articlesContent,udpipeModel)
 sentiments <- txt_sentiment(udpipedText, term = "lemma", 
                             polarity_terms = polarity_terms,
                             polarity_negators = polarity_negators, 
@@ -76,4 +128,6 @@ graphicLexicalNetworks <- cooc %>%
   geom_node_text(aes(label = name), vjust = 1.8, col = "darkgreen") +
   ggtitle("Les réseaux lexicaux à LRM") +
   theme_void()
+graphicLexicalNetworks
 ```
+

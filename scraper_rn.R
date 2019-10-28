@@ -1,7 +1,7 @@
 ## parameters
 targetUrl <- "https://rassemblementnational.fr/actualites/"
 pagerParameter <- "page/"
-nPagesTarget <- 5
+nPagesTarget <- 30
 
 ## waiting function
 
@@ -29,7 +29,7 @@ for(i in 2:nPagesTarget){
     articleLinks <- rbind(articleLinks,cbind(titles,links))
 }
 articleLinks$titles <- unlist(articleLinks$titles)
-articleLinks$links <- unlist(articleLinks$links)
+articleLinks$links <- unlist(articleLinks$links)[names(unlist(articleLinks$links))=="href"]
 write.csv(articleLinks,file="rnArticles.csv",row.names = FALSE)
 
 ## articles retrieval

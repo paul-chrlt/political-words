@@ -1,7 +1,7 @@
 ## parameters
 targetUrl <- "https://eelv.fr/categories/actu/"
 pagerParameter <- "page/"
-nPagesTarget <- 5
+nPagesTarget <- 30
 
 ## waiting function
 
@@ -22,6 +22,7 @@ links <- html_attrs(html_nodes(linksPage,linksCss))
 articleLinks <- rbind(articleLinks,cbind(titles,links))
 
 for(i in 2:nPagesTarget){
+    print(paste("starting",i,"of",nPagesTarget))
     randompause()
     linksPage <- read_html(paste0(targetUrl,pagerParameter,i))
     titles <- html_text(html_nodes(linksPage,titlesCss))[1:10]
@@ -40,7 +41,7 @@ titleCss <- "h1 span"
 
 articles <- data.frame(title = character(),date=character(),content=character())
 
-for(i in 33:length(articleLinks$links)){
+for(i in 290:length(articleLinks$links)){
     print(paste("article",i,"on",length(articleLinks$links)))
     randompause()
     articlePage <- read_html(articleLinks$links[i])
