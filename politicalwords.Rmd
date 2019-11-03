@@ -31,9 +31,46 @@ load('articlesEELV.Rdata')
 load('articlesLRM.Rdata')
 ```
 
-## Préparation des données : UDpipe
+## Nettoyage
 
-Nous allons ensuite utiliser UDpipe pour préparer nos données. Nous allons l'utiliser pour identifier dans nos textes :
+Commencons par rassembler et formater l'ensemble de ces données.  
+Pendant le scrapping, certaines données ont pu être en doublon, nous allons aussi nettoyer ca.
+```{r}
+articlesRN$parti <- "RN"
+articlesEELV$parti <- "EELV"
+articlesLRM$parti <- "LRM"
+articles <- rbind(articlesRN,articlesEELV,articlesLRM,stringsAsFactors=FALSE)
+articles$articleDate <- as.Date(articles$articleDate, format = "%d %B %Y")
+articles$parti <- factor(articles$parti)
+articles <- unique(articles,MARGIN=1)
+```
+
+## Périodicité
+
+Nous allons déterminer les périodes de pression selon les partis. Pour ca, nous allons créer 2 colonnes supplémentaires, correspondant aux mois et aux jours de la semaine.
+```{r}
+library(lubridate)
+articles$month <- month(articles$articleDate,label = TRUE)
+
+library(ggplot2)
+monthSeasonalityPlot <- ggplot(data = articles,aes(x=month,fill=parti)) + geom_bar(position=position_dodge2(preserve = "single")) + facet_grid(parti~.) + theme_light()
+monthSeasonalityPlot
+```
+```{r}
+articles$day <- day(articles$articleDate)
+daySeasonalityPlot <- ggplot(data = articles,aes(x=day,fill=parti)) + geom_bar(position=position_dodge2(preserve = "single")) + facet_grid(parti~.) + theme_light()
+daySeasonalityPlot
+```
+
+```{r}
+articles$weekDay <- wday(articles$articleDate,label = TRUE)
+weekDaySeasonalityPlot <- ggplot(data = articles,aes(x=weekDay,fill=parti)) + geom_bar(position=position_dodge2(preserve = "single")) + facet_grid(parti~.) + theme_light()
+weekDaySeasonalityPlot
+```
+
+## Préparation des données pour analyse NLP : UDpipe
+
+Nous allons ensuite utiliser UDpipe pour démarrer une analyse du contenu des articles. Nous allons l'utiliser pour identifier dans nos textes :
 
 * le radical de chaque mot : pour que les accords et la conjugaison ne perturbent pas l'analyse
 * la fonction grammaticale de chaque mot : nous pourrons par exemple choisir d'exclure les prépositions
@@ -43,7 +80,7 @@ Il faudra lui fournir un modèle correspondant à la langue francaise. Nous le t
 ```{r}
 library(udpipe)
 library(dplyr)
-# udpipe_download_model("french")
+if(!file.exists("french-gsd-ud-2.4-190531.udpipe")){udpipe_download_model("french")}
 udpipeModel <- udpipe_load_model("french-gsd-ud-2.4-190531.udpipe")
 ```
 
