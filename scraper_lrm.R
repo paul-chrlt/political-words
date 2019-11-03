@@ -2,7 +2,7 @@
 targetUrl <- "https://en-marche.fr/articles"
 rootUrl <- "https://en-marche.fr"
 pagerParameter <- "/tout/"
-nPagesTarget <- 5
+nPagesTarget <- 30
 
 ## waiting function
 
@@ -12,6 +12,8 @@ randompause <- function(){
 
 ## links retrieval
 library(rvest)
+library(stringr)
+
 articleLinks <- data.frame(title = character(),link=character())
 titlesCss <- "article.l__wrapper--narrow h2"
 linksCss <- "article.l__wrapper--narrow h2 > a"
@@ -39,14 +41,13 @@ articleLinks$links <- paste0(rootUrl,articleLinks$links)
 write.csv(articleLinks,file="lrmArticles.csv",row.names = FALSE)
 
 ## articles retrieval
-library(stringr)
 articleContentCss <- "article > p"
 dateCss <- "h2.text--gray"
 titleCss <- "h1"
 
 articles <- data.frame(title = character(),date=character(),content=character())
 
-for(i in 1:length(articleLinks$links)){
+for(i in 73:length(articleLinks$links)){
     print(paste("article",i,"on",length(articleLinks$links)))
     randompause()
     articlePage <- read_html(articleLinks$links[i])
