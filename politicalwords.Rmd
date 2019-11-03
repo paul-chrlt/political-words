@@ -1,7 +1,7 @@
 ---
 title: "Analyse sémantique des partis politiques francais"
 author: "Paul Charlet"
-date: "October 20, 2019"
+date: "2019-11-02"
 output: html_document
 ---
 
@@ -84,12 +84,12 @@ if(!file.exists("french-gsd-ud-2.4-190531.udpipe")){udpipe_download_model("frenc
 udpipeModel <- udpipe_load_model("french-gsd-ud-2.4-190531.udpipe")
 ```
 
-Il nous reste alors à préparer les donnés pour nos 3 ensembles de textes :
+Il nous reste alors à préparer les données pour nos 3 ensembles de textes :
 
 ```{r}
-udpipedLRM <- udpipe(articlesLRM$articleContent,udpipeModel)
-udpipedEELV <- udpipe(articlesEELV$articleContent,udpipeModel)
-udpipedRN <- udpipe(articlesRN$articleContent,udpipeModel)
+udpipedEELV <- udpipe(articles$articleContent[articles$parti=="EELV"],udpipeModel)
+udpipedRN <- udpipe(articles$articleContent[articles$parti=="RN"],udpipeModel)
+udpipedLRM <- udpipe(articles$articleContent[articles$parti=="LRM"],udpipeModel)
 ```
 
 ## Réseaux lexicaux
@@ -99,19 +99,19 @@ Nous pouvons commencer par regarder les mots souvent présents ensembles. Cela n
 ```{r,fig.height=24,fig.width=8}
 library(cowplot)
 coocurences <- list()
-viewCoocurences <- function(udpipeObjects){
+viewCoocurences <- function(udpipeObjects,coocLimitation=40){
     for(i in 1:length(udpipeObjects)){
         coocurences[[i]] <- cooccurrence(x = subset(udpipeObjects[[i]], upos %in% c("NOUN", "ADJ")), 
                                        term = "lemma",
                                        group = c("sentence_id"),
                                        skipgram = 4)
     }
-    wordnetwork <- lapply(coocurences, head,30)
+    wordnetwork <- lapply(coocurences, head,coocLimitation)
     wordnetwork <- lapply(wordnetwork, graph_from_data_frame)
     coocGraphs <- list()
     for (i in 1:length(wordnetwork)) {
         coocGraphs[[i]] <- ggraph(wordnetwork[[i]], layout = "fr") +
-            geom_edge_link(aes(width = cooc, edge_alpha = cooc), edge_colour = "blue") +
+            geom_edge_link(aes(width = cooc, edge_alpha = cooc), edge_colour = "lightgreen") +
             geom_node_text(aes(label = name), col = "black", size = 4) +
             theme(legend.position = "none") +
             labs(title = paste("Cooccurrences des mots,",names(udpipeObjects[i])), subtitle = "Nouns & Adjective")
@@ -119,52 +119,54 @@ viewCoocurences <- function(udpipeObjects){
     plot_grid(plotlist = coocGraphs, labels = "",ncol=1) + theme_void()
 }
 udpipeObjects <- list("EELV"=udpipedEELV,"LRM"=udpipedLRM,"RN"=udpipedRN)
-viewCoocurences(udpipeObjects)
+viewCoocurences(udpipeObjects,50)
 ```
 
 
-## Sentiments
+## Sentiments négatifs
 
 ```{r}
-
-udpipedText <- udpipedEELV
-
 library(magrittr)
 load(file("https://github.com/sborms/sentometrics/raw/master/data-raw/FEEL_fr.rda"))
 load(file("https://github.com/sborms/sentometrics/raw/master/data-raw/valence-raw/valShifters.rda"))
-polarity_terms <- rename(FEEL_fr, term = x, polarity = y)
-polarity_negators <- subset(valShifters$valence_fr, t == 1)$x
-polarity_amplifiers <- subset(valShifters$valence_fr, t == 2)$x
-polarity_deamplifiers <- subset(valShifters$valence_fr, t == 3)$x
 
-sentiments <- txt_sentiment(udpipedText, term = "lemma", 
-                            polarity_terms = polarity_terms,
-                            polarity_negators = polarity_negators, 
-                            polarity_amplifiers = polarity_amplifiers,
-                            polarity_deamplifiers = polarity_deamplifiers)
-sentiments <- sentiments$data
-reasons <- sentiments %>% 
-  cbind_dependencies() %>%
-  select(doc_id, lemma, token, upos, sentiment_polarity, token_parent, lemma_parent, upos_parent, dep_rel) #%>%
-#  filter(sentiment_polarity < 0)
-reasons <- filter(reasons, dep_rel %in% "amod")
-word_cooccurences <- reasons %>% 
-  group_by(lemma, lemma_parent) %>%
-  summarise(cooc = n()) %>%
-  arrange(-cooc)
-vertices <- bind_rows(
-  data_frame(key = unique(reasons$lemma)) %>% mutate(in_dictionary = if_else(key %in% polarity_terms$term, "in_dictionary", "linked-to")),
-  data_frame(key = unique(setdiff(reasons$lemma_parent, reasons$lemma))) %>% mutate(in_dictionary = "linked-to"))
-cooc <- head(word_cooccurences, 50)
-set.seed(123456789)
-graphicLexicalNetworks <- cooc %>%  
-  graph_from_data_frame(vertices = filter(vertices, key %in% c(cooc$lemma, cooc$lemma_parent))) %>%
-  ggraph(layout = "fr") +
-  geom_edge_link0(aes(edge_alpha = cooc, edge_width = cooc)) +
-  geom_node_point(aes(colour = in_dictionary), size = 5) +
-  geom_node_text(aes(label = name), vjust = 1.8, col = "darkgreen") +
-  ggtitle("Les réseaux lexicaux à LRM") +
-  theme_void()
-graphicLexicalNetworks
+sentimentsGraph <- function(udpipedText, graphTitle){
+  polarity_terms <- rename(FEEL_fr, term = x, polarity = y)
+  polarity_negators <- subset(valShifters$valence_fr, t == 1)$x
+  polarity_amplifiers <- subset(valShifters$valence_fr, t == 2)$x
+  polarity_deamplifiers <- subset(valShifters$valence_fr, t == 3)$x
+  
+  sentiments <- txt_sentiment(udpipedText, term = "lemma", 
+                              polarity_terms = polarity_terms,
+                              polarity_negators = polarity_negators, 
+                              polarity_amplifiers = polarity_amplifiers,
+                              polarity_deamplifiers = polarity_deamplifiers)
+  sentiments <- sentiments$data
+  reasons <- sentiments %>% 
+    cbind_dependencies() %>%
+    select(doc_id, lemma, token, upos, sentiment_polarity, token_parent, lemma_parent, upos_parent, dep_rel) %>% filter(sentiment_polarity < 0)
+  reasons <- filter(reasons, dep_rel %in% "amod")
+  word_cooccurences <- reasons %>% 
+    group_by(lemma, lemma_parent) %>%
+    summarise(cooc = n()) %>%
+    arrange(-cooc)
+  vertices <- bind_rows(
+    data_frame(key = unique(reasons$lemma)) %>% mutate(in_dictionary = if_else(key %in% polarity_terms$term, "in_dictionary", "linked-to")),
+    data_frame(key = unique(setdiff(reasons$lemma_parent, reasons$lemma))) %>% mutate(in_dictionary = "linked-to"))
+  cooc <- head(word_cooccurences, 50)
+  set.seed(123456789)
+  graphicLexicalNetworks <- cooc %>%  
+    graph_from_data_frame(vertices = filter(vertices, key %in% c(cooc$lemma, cooc$lemma_parent))) %>%
+    ggraph(layout = "fr") +
+    geom_edge_link0(aes(edge_alpha = cooc, edge_width = cooc)) +
+    geom_node_point(aes(colour = in_dictionary), size = 5) +
+    geom_node_text(aes(label = name), vjust = 1.8, col = "darkgreen") +
+    ggtitle(graphTitle) +
+    theme_void()
+  graphicLexicalNetworks
+}
+sentimentsGraph(udpipedEELV,"réseaux lexicaux à EELV dans les phrases analysées comme négatives")
+sentimentsGraph(udpipedRN,"réseaux lexicaux à RN dans les phrases analysées comme négatives")
+sentimentsGraph(udpipedLRM,"réseaux lexicaux à LRM dans les phrases analysées comme négatives")
 ```
 
