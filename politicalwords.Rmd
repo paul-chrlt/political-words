@@ -82,16 +82,25 @@ Il faudra lui fournir un modèle correspondant à la langue francaise. Nous le t
 ```{r}
 library(udpipe)
 library(dplyr)
-if(!file.exists("french-gsd-ud-2.4-190531.udpipe")){udpipe_download_model("french")}
-udpipeModel <- udpipe_load_model("french-gsd-ud-2.4-190531.udpipe")
+# if(!file.exists("french-gsd-ud-2.4-190531.udpipe")){udpipe_download_model("french")}
+# udpipeModel <- udpipe_load_model("french-gsd-ud-2.4-190531.udpipe")
 ```
 
-Il nous reste alors à préparer les données pour nos 3 ensembles de textes :
+Il nous reste alors à préparer les données pour nos textes :
+
+```{r,cache=TRUE}
+processedArticles <- udpipe(articles$articleContent,object="french-gsd")
+# udpipedEELV <- udpipe(articles$articleContent[articles$parti=="EELV"],udpipeModel)
+# udpipedRN <- udpipe(articles$articleContent[articles$parti=="RN"],udpipeModel)
+# udpipedLRM <- udpipe(articles$articleContent[articles$parti=="LRM"],udpipeModel)
+```
+
+On crée aussi un dictionnaire nous permettant de faire l'équivalence entre le numéro du document et sa source :
 
 ```{r}
-udpipedEELV <- udpipe(articles$articleContent[articles$parti=="EELV"],udpipeModel)
-udpipedRN <- udpipe(articles$articleContent[articles$parti=="RN"],udpipeModel)
-udpipedLRM <- udpipe(articles$articleContent[articles$parti=="LRM"],udpipeModel)
+docDictionnary <- data.frame(docID = paste0("doc",1:nrow(articles)),
+                             source = articles$parti
+                             )
 ```
 
 ## Réseaux lexicaux
@@ -120,10 +129,12 @@ viewCoocurences <- function(udpipeObjects,coocLimitation=40){
     }
     plot_grid(plotlist = coocGraphs, labels = "",ncol=1) + theme_void()
 }
-udpipeObjects <- list("EELV"=udpipedEELV,"LRM"=udpipedLRM,"RN"=udpipedRN)
+udpipeObjects <- list("Corpus complet"=processedArticles,
+                      "EELV"=filter(processedArticles,doc_id %in% docDictionnary$docID[docDictionnary$source=="EELV"]),
+                      "LRM"=filter(processedArticles,doc_id %in% docDictionnary$docID[docDictionnary$source=="LRM"]),
+                      "RN"=filter(processedArticles,doc_id %in% docDictionnary$docID[docDictionnary$source=="RN"]))
 viewCoocurences(udpipeObjects,50)
 ```
-
 
 ## Sentiments négatifs
 
@@ -167,8 +178,31 @@ sentimentsGraph <- function(udpipedText, graphTitle){
     theme_void()
   graphicLexicalNetworks
 }
-sentimentsGraph(udpipedEELV,"réseaux lexicaux à EELV dans les phrases analysées comme négatives")
-sentimentsGraph(udpipedRN,"réseaux lexicaux à RN dans les phrases analysées comme négatives")
-sentimentsGraph(udpipedLRM,"réseaux lexicaux à LRM dans les phrases analysées comme négatives")
+sentimentsGraph(udpipeObjects[[2]],"réseaux lexicaux à EELV dans les phrases analysées comme négatives")
+sentimentsGraph(udpipeObjects[[3]],"réseaux lexicaux à LRM dans les phrases analysées comme négatives")
+sentimentsGraph(udpipeObjects[[4]],"réseaux lexicaux à RN dans les phrases analysées comme négatives")
 ```
 
+## Analyse des sujets
+
+La librairie text2vec contient l'implémantation de l'algorithme LDA (Latent Dirichlet Allocation). Nous avons 3 hyperparamètres :
+
+* le nombre de sujets à extraire. Arbitrairement, nous en extraierons 7.
+* la propension à avoir peu de sujets par document
+* la propension à avoir peu de mots par sujet
+
+```{r}
+#processedArticles <- udpipe(articles$articleContent,object="french-gsd")
+
+
+dtf <- document_term_frequencies(filter(processedArticles,upos %in% c("ADJ","NOUN")),"doc_id","lemma")
+dtm <- document_term_matrix(dtf)
+
+library(text2vec)
+lda_model = LDA$new(n_topics = 10, doc_topic_prior = 0.1, topic_word_prior = 0.01)
+doc_topic_distr = 
+  lda_model$fit_transform(x = dtm, n_iter = 1000, 
+                          convergence_tol = 0.001, n_check_convergence = 25, 
+                          progressbar = FALSE)
+
+```
