@@ -124,6 +124,7 @@ viewCoocurences <- function(udpipeObjects,coocLimitation=40){
         coocGraphs[[i]] <- ggraph(wordnetwork[[i]], layout = "fr") +
             geom_edge_link(aes(width = cooc, edge_alpha = cooc), edge_colour = "lightgreen") +
             geom_node_text(aes(label = name), col = "black", size = 4) +
+            theme_light() +
             theme(legend.position = "none") +
             labs(title = paste("Cooccurrences des mots,",names(udpipeObjects[i])), subtitle = "Nouns & Adjective")
     }
@@ -187,22 +188,47 @@ sentimentsGraph(udpipeObjects[[4]],"réseaux lexicaux à RN dans les phrases ana
 
 La librairie text2vec contient l'implémantation de l'algorithme LDA (Latent Dirichlet Allocation). Nous avons 3 hyperparamètres :
 
-* le nombre de sujets à extraire. Arbitrairement, nous en extraierons 7.
+* le nombre de sujets à extraire. Arbitrairement, nous en extraierons 6.
 * la propension à avoir peu de sujets par document
 * la propension à avoir peu de mots par sujet
 
 ```{r}
-#processedArticles <- udpipe(articles$articleContent,object="french-gsd")
-
-
 dtf <- document_term_frequencies(filter(processedArticles,upos %in% c("ADJ","NOUN")),"doc_id","lemma")
 dtm <- document_term_matrix(dtf)
 
 library(text2vec)
-lda_model = LDA$new(n_topics = 10, doc_topic_prior = 0.1, topic_word_prior = 0.01)
-doc_topic_distr = 
-  lda_model$fit_transform(x = dtm, n_iter = 1000, 
-                          convergence_tol = 0.001, n_check_convergence = 25, 
-                          progressbar = FALSE)
+lda_model <-  LDA$new(n_topics = 6, doc_topic_prior = 0.1, topic_word_prior = 0.01)
+subjects <- lda_model$fit_transform(x = dtm, n_iter = 1000, convergence_tol = 0.001, n_check_convergence = 25, progressbar = FALSE)
+topWords <- lda_model$get_top_words(n = 10,lambda = 0.3)
+kable(topWords)
+```
 
+On distingue quelques sujets :
+
+* l'écologie
+* l'agriculture
+* la campagne politique
+* l'europe
+* la souveraineté nationale
+
+Voyons leur représentation selon les sources de texte.
+
+```{r}
+subjects <- data.frame(doc_id = rownames(subjects),subjects)
+docDictionnary <- left_join(docDictionnary,subjects,by=c("docID"="doc_id"))
+#library(purrr)
+subjectNames <- apply(
+  topWords[1:3,],
+  2,
+  paste,
+  collapse=" "
+)
+docDictionnary$majorSubject <- character(length = nrow(docDictionnary))
+for(i in 1:nrow(docDictionnary)){
+  if(anyNA(docDictionnary[i,3:8])){docDictionnary$majorSubject[i] <- NA}else{
+    docDictionnary$majorSubject[i] <- subjectNames[which.max(docDictionnary[i,3:8])]
+  }
+}
+subjectsPlot <- ggplot(docDictionnary,aes(majorSubject,fill=source)) + geom_bar() + theme_light() + theme(axis.text.x = element_text(angle = 90, hjust = 1))
+subjectsPlot
 ```
