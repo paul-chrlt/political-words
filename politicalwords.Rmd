@@ -9,6 +9,7 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, cache = TRUE)
 library(ggraph)
 library(igraph)
+library(kableExtra)
 ```
 
 ## Introduction
@@ -77,22 +78,17 @@ Nous allons ensuite utiliser UDpipe pour démarrer une analyse du contenu des ar
 * le radical de chaque mot : pour que les accords et la conjugaison ne perturbent pas l'analyse
 * la fonction grammaticale de chaque mot : nous pourrons par exemple choisir d'exclure les prépositions
 
-Il faudra lui fournir un modèle correspondant à la langue francaise. Nous le téléchargeons une fois sur le disque avec la fonction `udpipe_download_model`.
+Il faudra lui fournir un modèle correspondant à la langue francaise. UDpipe fournit plusieurs modèles, nous choisissons french-gsd.
 
 ```{r}
 library(udpipe)
 library(dplyr)
-# if(!file.exists("french-gsd-ud-2.4-190531.udpipe")){udpipe_download_model("french")}
-# udpipeModel <- udpipe_load_model("french-gsd-ud-2.4-190531.udpipe")
 ```
 
 Il nous reste alors à préparer les données pour nos textes :
 
 ```{r,cache=TRUE}
 processedArticles <- udpipe(articles$articleContent,object="french-gsd")
-# udpipedEELV <- udpipe(articles$articleContent[articles$parti=="EELV"],udpipeModel)
-# udpipedRN <- udpipe(articles$articleContent[articles$parti=="RN"],udpipeModel)
-# udpipedLRM <- udpipe(articles$articleContent[articles$parti=="LRM"],udpipeModel)
 ```
 
 On crée aussi un dictionnaire nous permettant de faire l'équivalence entre le numéro du document et sa source :
@@ -216,7 +212,6 @@ Voyons leur représentation selon les sources de texte.
 ```{r}
 subjects <- data.frame(doc_id = rownames(subjects),subjects)
 docDictionnary <- left_join(docDictionnary,subjects,by=c("docID"="doc_id"))
-#library(purrr)
 subjectNames <- apply(
   topWords[1:3,],
   2,
