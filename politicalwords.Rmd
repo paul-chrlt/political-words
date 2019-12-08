@@ -13,7 +13,9 @@ library(igraph)
 
 ## Introduction
 
-Nous allons analyser le contenu texte de 3 partis politiques francais pour voir comment ils diffèrent.
+Nous allons analyser le contenu texte de 3 partis politiques francais pour voir comment ils diffèrent. Nous pourrons observer : les réseaux lexicaux, les sentiments, les sujets abordés. À la fin, cela nous permettra d'envisager le machine learning pour reconnaitre la couleur politique des textes.
+
+Le code source est disponible sur https://github.com/paul-chrlt/political-words
 
 ## Acquisition des données : scrapping
 
